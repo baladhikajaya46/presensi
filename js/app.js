@@ -208,11 +208,11 @@ function updateStats() {
 
     // Golongan config: name, icon, color
     const golonganList = [
-        { name: 'Siaga',     icon: 'fa-child',        color: '#f59e0b' },
-        { name: 'Penggalang',icon: 'fa-hiking',        color: '#3b82f6' },
-        { name: 'Penegak',   icon: 'fa-user-shield',   color: '#8b5cf6' },
-        { name: 'Pandega',   icon: 'fa-user-graduate', color: '#ec4899' },
-        { name: 'Pembina',   icon: 'fa-chalkboard-teacher', color: '#10b981' },
+        { name: 'Siaga',     icon: 'fa-child',             color: '#22c55e' },
+        { name: 'Penggalang',icon: 'fa-hiking',             color: '#ef4444' },
+        { name: 'Penegak',   icon: 'fa-user-shield',        color: '#eab308' },
+        { name: 'Pandega',   icon: 'fa-user-graduate',      color: '#f97316' },
+        { name: 'Pembina',   icon: 'fa-chalkboard-teacher', color: '#a855f7' },
     ];
 
     // Count total members per golongan
