@@ -108,12 +108,9 @@ function getMembers() {
   const sheet = ss.getSheetByName(SHEET_ANGGOTA);
   const data = sheet.getDataRange().getValues();
   let members = [];
-  // Trim semua header agar tidak ada spasi tersembunyi yang menyebabkan key tidak cocok
-  let headers = data[0].map(h => String(h).trim());
+  let headers = data[0];
   
   for(let i = 1; i < data.length; i++) {
-    // Lewati baris kosong
-    if(data[i].every(cell => cell === "" || cell === null || cell === undefined)) continue;
     let member = {};
     for(let j = 0; j < headers.length; j++) {
       member[headers[j]] = data[i][j];
@@ -129,11 +126,9 @@ function getAttendance() {
   const sheet = ss.getSheetByName(SHEET_ABSENSI);
   const data = sheet.getDataRange().getValues();
   let attendance = [];
-  // Trim semua header agar tidak ada spasi tersembunyi
-  let headers = data[0].map(h => String(h).trim());
+  let headers = data[0];
   
   for(let i = 1; i < data.length; i++) {
-    if(data[i].every(cell => cell === "" || cell === null || cell === undefined)) continue;
     let rec = {};
     for(let j = 0; j < headers.length; j++) {
       rec[headers[j]] = data[i][j];
