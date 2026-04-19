@@ -37,6 +37,7 @@ async function initApp() {
             fetchAttendance()
         ]);
         updateStats();
+        renderRecentAttendance();
         populateManualSelect();
         updateVisibility();
         initScanner();
@@ -84,6 +85,12 @@ function setupEventListeners() {
             if(targetId === 'manual-view') {
                 document.getElementById('searchAnggotaAbsen').value = '';
                 clearManualMember();
+                // Refresh data absensi agar filter "sudah absen" selalu akurat
+                fetchAttendance().then(() => {
+                    renderManualMemberList('');
+                    updateStats();
+                    renderRecentAttendance();
+                });
             }
             if(targetId === 'admin-view') {
                 currentPage = 1;
@@ -284,6 +291,84 @@ function updateStats() {
 }
 
 // =======================
+// RECENT ATTENDANCE
+// =======================
+
+function renderRecentAttendance() {
+    const container = document.getElementById('recentAttendanceList');
+    const countBadge = document.getElementById('recentAttendanceCount');
+    if (!container) return;
+
+    const today = new Date();
+    const dateStr = today.getFullYear() + '-' +
+        String(today.getMonth() + 1).padStart(2, '0') + '-' +
+        String(today.getDate()).padStart(2, '0');
+
+    // Filter absensi hari ini, urutkan terbaru di atas
+    const todayAttendance = attendance
+        .filter(rec => String(rec["TANGGAL"]).substring(0, 10) === dateStr)
+        .slice()
+        .reverse()
+        .slice(0, 10);
+
+    countBadge.textContent = todayAttendance.length + ' orang';
+
+    if (todayAttendance.length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:20px; opacity:0.4; font-size:0.85rem;">
+                <i class="fas fa-inbox" style="font-size:1.5rem; display:block; margin-bottom:6px;"></i>
+                Belum ada presensi hari ini
+            </div>`;
+        return;
+    }
+
+    // Build member foto lookup
+    const memberMap = {};
+    members.forEach(m => { memberMap[m["ID (BARCODE)"]] = m; });
+
+    const statusColor = { 'Hadir': '#4ade80', 'Ijin': '#60a5fa', 'Sakit': '#f59e0b', 'Alpa': '#f87171' };
+    const statusIcon  = { 'Hadir': 'fa-check-circle', 'Ijin': 'fa-door-open', 'Sakit': 'fa-heartbeat', 'Alpa': 'fa-times-circle' };
+
+    container.innerHTML = '';
+    todayAttendance.forEach((rec, idx) => {
+        const id     = rec["ID (BARCODE)"];
+        const nama   = rec["NAMA LENGKAP"] || '-';
+        const gol    = rec["GOL. KEANGGOTAAN"] || '-';
+        const status = rec["STATUS"] || 'Hadir';
+        const waktu  = String(rec["WAKTU"] || '').substring(0, 5) || '--:--';
+        const foto   = (memberMap[id] && memberMap[id]["URL FOTO"]) || 'https://via.placeholder.com/40';
+        const color  = statusColor[status] || '#94a3b8';
+        const icon   = statusIcon[status]  || 'fa-circle';
+
+        const item = document.createElement('div');
+        item.style.cssText = `
+            display:flex; align-items:center; gap:10px;
+            padding:9px 4px;
+            border-bottom: ${idx < todayAttendance.length - 1 ? '1px solid rgba(255,255,255,0.07)' : 'none'};
+            animation: fadeInUp 0.3s ease both;
+            animation-delay: ${idx * 40}ms;
+        `;
+        item.innerHTML = `
+            <div style="position:relative; flex-shrink:0;">
+                <img src="${foto}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid ${color}40;">
+                <span style="position:absolute;bottom:-2px;right:-2px;background:${color};border-radius:50%;width:14px;height:14px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg-color,#0f172a);">
+                    <i class="fas ${icon}" style="font-size:7px;color:#fff;"></i>
+                </span>
+            </div>
+            <div style="flex:1; min-width:0;">
+                <div style="font-weight:600; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${nama}</div>
+                <div style="font-size:0.7rem; opacity:0.55;">${id} &bull; ${gol}</div>
+            </div>
+            <div style="text-align:right; flex-shrink:0;">
+                <div style="font-size:0.82rem; font-weight:700; color:${color};">${waktu}</div>
+                <div style="font-size:0.68rem; color:${color}; opacity:0.8;">${status}</div>
+            </div>
+        `;
+        container.appendChild(item);
+    });
+}
+
+// =======================
 // API CALLS (Dummy fetch if Script URL is not set, else real fetch)
 // =======================
 
@@ -341,6 +426,10 @@ async function fetchMembers() {
 async function fetchAttendance() {
     try {
         attendance = await callAPI('getAttendance');
+        // Debug: log sample data untuk verifikasi format tanggal & waktu
+        if (attendance.length > 0) {
+            console.log('[Debug] Sample absensi:', JSON.stringify(attendance[attendance.length - 1]));
+        }
     } catch(e) {}
 }
 
@@ -352,8 +441,13 @@ async function submitAttendance(id, status = 'Hadir') {
         if(result.status === 'success') {
             await fetchAttendance();
             updateStats();
+            renderRecentAttendance();
+            renderManualMemberList(document.getElementById('searchAnggotaAbsen')?.value || '');
             showResultModal(result.member, 'Berhasil Absen');
         } else if(result.status === 'already') {
+            // Refresh juga agar anggota yang ternyata sudah absen hilang dari daftar
+            await fetchAttendance();
+            renderManualMemberList(document.getElementById('searchAnggotaAbsen')?.value || '');
             showResultModal(result.member, 'Sudah Absen Hari Ini');
         } else {
             Swal.fire('Gagal', result.message, 'error');
@@ -434,12 +528,40 @@ function populateManualSelect() {
 function renderManualMemberList(query) {
     const container = document.getElementById('listAnggotaAbsen');
     if (!container) return;
+
+    // Buat set ID anggota yang sudah absen hari ini
+    const today = new Date();
+    const dateStr = today.getFullYear() + '-' +
+        String(today.getMonth() + 1).padStart(2, '0') + '-' +
+        String(today.getDate()).padStart(2, '0');
+    const absenHariIni = new Set(
+        attendance
+            .filter(rec => String(rec["TANGGAL"]).substring(0, 10) === dateStr)
+            .map(rec => String(rec["ID (BARCODE)"]))
+    );
+
+    // Filter: belum absen hari ini, lalu filter query pencarian
     const q = query.toLowerCase().trim();
+    const belumAbsen = members.filter(m => !absenHariIni.has(String(m["ID (BARCODE)"])));
+
+    // Update badge counter
+    const countBadge = document.getElementById('belumAbsenCount');
+    if (countBadge) countBadge.textContent = belumAbsen.length + ' belum absen';
+
     const filtered = q
-        ? members.filter(m =>
+        ? belumAbsen.filter(m =>
             (m["NAMA LENGKAP"] || '').toLowerCase().includes(q) ||
             (m["ID (BARCODE)"] || '').toLowerCase().includes(q))
-        : members;
+        : belumAbsen;
+
+    if (belumAbsen.length === 0) {
+        container.innerHTML = `
+            <div style="padding:24px 16px; text-align:center; opacity:0.5; font-size:0.85rem;">
+                <i class="fas fa-check-double" style="font-size:1.8rem; display:block; margin-bottom:8px; color:#4ade80; opacity:0.7;"></i>
+                Semua anggota sudah melakukan absensi hari ini
+            </div>`;
+        return;
+    }
 
     if (filtered.length === 0) {
         container.innerHTML = `<div style="padding:16px; text-align:center; opacity:0.5; font-size:0.85rem;">Anggota tidak ditemukan</div>`;
@@ -447,6 +569,13 @@ function renderManualMemberList(query) {
     }
 
     const selectedId = document.getElementById('selectAnggotaAbsen').value;
+
+    // Jika anggota yang dipilih ternyata sudah absen, reset pilihan
+    if (selectedId && absenHariIni.has(selectedId)) {
+        clearManualMember();
+        return;
+    }
+
     container.innerHTML = '';
     filtered.forEach(m => {
         const id = m["ID (BARCODE)"];
