@@ -349,11 +349,12 @@ async function submitAttendance(id, status = 'Hadir') {
     try {
         const result = await callAPI('scanBarcode', { id: id, status: status });
         Swal.close();
-        if(result.status === 'success' || result.status === 'info') {
-            await fetchAttendance(); // refresh logic
+        if(result.status === 'success') {
+            await fetchAttendance();
             updateStats();
-            showResultModal(result.member, result.status === 'info' ? 'Sudah Absen' : 'Berhasil Absen');
-            if(result.status === 'info') Swal.fire('Info', result.message, 'info');
+            showResultModal(result.member, 'Berhasil Absen');
+        } else if(result.status === 'already') {
+            showResultModal(result.member, 'Sudah Absen Hari Ini');
         } else {
             Swal.fire('Gagal', result.message, 'error');
         }
@@ -702,9 +703,12 @@ function showResultModal(member, msg) {
     document.getElementById('resGolongan').innerText = member["GOL. KEANGGOTAAN"];
     
     let isSuccess = msg.includes('Berhasil');
+    let isAlready = msg.includes('Sudah Absen');
+    const iconClass = isSuccess ? 'fa-check-circle' : 'fa-clock';
+    const iconColor = isSuccess ? 'var(--success-color)' : '#f59e0b';
     document.getElementById('resStatus').innerHTML = `
-        <i class="fas ${isSuccess ? 'fa-check-circle' : 'fa-info-circle'}" style="font-size: 2rem; display:block; margin-bottom: 10px; color:${isSuccess?'var(--success-color)':'#3b82f6'};"></i>
-        <span style="color:${isSuccess?'var(--success-color)':'#3b82f6'};">${msg}</span>
+        <i class="fas ${iconClass}" style="font-size: 2rem; display:block; margin-bottom: 10px; color:${iconColor};"></i>
+        <span style="color:${iconColor};">${msg}</span>
     `;
     
     document.getElementById('resultModal').style.display = 'flex';
