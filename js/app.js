@@ -554,12 +554,16 @@ function renderReportTable() {
 
     filteredData.forEach(rec => {
         let timeStr = rec["WAKTU"];
-        // Data dari GS sudah HH:mm, fallback jika masih ISO string
+        // Data dari GS sudah format HH:mm (WIB), fallback jika masih format lama
         if (timeStr && String(timeStr).length > 5) {
             try {
                 const t = new Date(timeStr);
                 if (!isNaN(t.getTime())) {
-                    timeStr = String(t.getUTCHours()).padStart(2, '0') + ':' + String(t.getUTCMinutes()).padStart(2, '0');
+                    // Konversi ke WIB (UTC+7)
+                    const wibOffset = 7 * 60;
+                    const localOffset = t.getTimezoneOffset();
+                    const wibTime = new Date(t.getTime() + (wibOffset + localOffset) * 60000);
+                    timeStr = String(wibTime.getHours()).padStart(2, '0') + ':' + String(wibTime.getMinutes()).padStart(2, '0');
                 } else {
                     timeStr = String(timeStr).substring(11, 16);
                 }
