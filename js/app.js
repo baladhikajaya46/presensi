@@ -40,7 +40,6 @@ async function initApp() {
         renderRecentAttendance();
         populateManualSelect();
         updateVisibility();
-        initScanner();
         // Re-render laporan jika view laporan sedang aktif
         if (document.getElementById('report-view').style.display !== 'none') {
             renderReportTable();
@@ -57,48 +56,45 @@ async function initApp() {
     }
 }
 
-function setupEventListeners() {
-    // Navigation Menus
-    document.querySelectorAll('.menu-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const targetId = e.currentTarget.dataset.target;
-            
-            // UI Button Active State
-            document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
-            e.currentTarget.classList.add('active');
+// Navigasi ke view tertentu
+function navigateTo(targetId) {
+    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+    const el = document.getElementById(targetId);
+    if (el) el.style.display = 'block';
 
-            // View Swapping
-            document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-            document.getElementById(targetId).style.display = 'block';
-
-            // Special actions when entering views
-            if(targetId === 'scan-view') {
-                if(!scanReader) initScanner();
-            } else {
-                if(scanReader) {
-                    scanReader.clear();
-                    scanReader = null;
-                }
-            }
-
-            if(targetId === 'report-view') renderReportTable();
-            if(targetId === 'manual-view') {
-                document.getElementById('searchAnggotaAbsen').value = '';
-                clearManualMember();
-                // Refresh data absensi agar filter "sudah absen" selalu akurat
-                fetchAttendance().then(() => {
-                    renderManualMemberList('');
-                    updateStats();
-                    renderRecentAttendance();
-                });
-            }
-            if(targetId === 'admin-view') {
-                currentPage = 1;
-                renderMembersTable();
-            }
-        });
+    // Update active state bottom nav
+    document.querySelectorAll('.nav-btn[data-target]').forEach(b => {
+        b.classList.toggle('active', b.dataset.target === targetId);
     });
 
+    if (targetId === 'report-view') renderReportTable();
+    if (targetId === 'manual-view') {
+        document.getElementById('searchAnggotaAbsen').value = '';
+        clearManualMember();
+        fetchAttendance().then(() => {
+            renderManualMemberList('');
+            updateStats();
+            renderRecentAttendance();
+        });
+    }
+    if (targetId === 'admin-view') { currentPage = 1; renderMembersTable(); }
+}
+
+function openScanOverlay() {
+    document.getElementById('scanOverlay').classList.add('open');
+    document.getElementById('manualBarcode').value = '';
+    initScanner();
+    // Mark camera button active
+    document.querySelectorAll('.nav-btn-camera').forEach(b => b.classList.add('scanning'));
+}
+
+function closeScanOverlay() {
+    document.getElementById('scanOverlay').classList.remove('open');
+    if (scanReader) { scanReader.clear(); scanReader = null; }
+    document.querySelectorAll('.nav-btn-camera').forEach(b => b.classList.remove('scanning'));
+}
+
+function setupEventListeners() {
     // Login logic
     const inputPassword = document.getElementById('adminPassword');
     document.getElementById('btnLogin').addEventListener('click', () => {
@@ -111,7 +107,7 @@ function setupEventListeners() {
         sessionStorage.removeItem('isAdmin');
         updateVisibility();
         Swal.fire('Logout', 'Anda telah keluar dari mode admin.', 'info');
-        document.querySelector('[data-target="scan-view"]').click();
+        navigateTo('home-view');
     });
 
     const attemptLogin = () => {
@@ -132,8 +128,17 @@ function setupEventListeners() {
     // Manual Barcode Input
     document.getElementById('btnSubmitBarcode').addEventListener('click', () => {
         const val = document.getElementById('manualBarcode').value.trim();
-        if(val) processScan(val);
+        if(val) { closeScanOverlay(); processScan(val); }
     });
+    document.getElementById('manualBarcode').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const val = e.target.value.trim();
+            if (val) { closeScanOverlay(); processScan(val); }
+        }
+    });
+
+    // Close scan overlay
+    document.getElementById('btnCloseScan').addEventListener('click', closeScanOverlay);
 
     // Form Manual Absen
     document.getElementById('formManualAbsen').addEventListener('submit', (e) => {
@@ -154,8 +159,7 @@ function setupEventListeners() {
     // Sync button
     document.getElementById('btnSyncReport').addEventListener('click', initApp);
 
-    // Statistik button
-    document.getElementById('btnStatistik').addEventListener('click', openStatistikModal);
+    // Statistik button (dari navbar)
     document.getElementById('statFilterType').addEventListener('change', toggleStatCustomRange);
     document.getElementById('btnApplyStatFilter').addEventListener('click', renderStatistikModal);
     document.getElementById('btnPrintStatistik').addEventListener('click', printStatistik);
@@ -212,16 +216,52 @@ function setupEventListeners() {
 }
 
 function updateVisibility() {
-    if(isAdmin) {
-        document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
-        document.getElementById('btnLogin').style.display = 'none';
-        document.getElementById('btnLogout').style.display = '';
-    } else {
-        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
-        document.getElementById('btnLogin').style.display = '';
-        document.getElementById('btnLogout').style.display = 'none';
-    }
+    document.getElementById('btnLogin').style.display  = isAdmin ? 'none' : '';
+    document.getElementById('btnLogout').style.display = isAdmin ? '' : 'none';
+    renderBottomNav();
 }
+
+function renderBottomNav() {
+    const nav = document.getElementById('bottomNav');
+    if (!nav) return;
+
+    // Definisi tombol sesuai role
+    // Admin: Absen Manual | Kelola Anggota | [KAMERA] | Laporan | Statistik
+    // Tamu:  Absen Manual | [KAMERA] | Statistik
+    const adminBtns = [
+        { icon: 'fa-keyboard',   label: 'Manual',   target: 'manual-view' },
+        { icon: 'fa-users-cog',  label: 'Kelola',   target: 'admin-view'  },
+        { icon: 'fa-qrcode',     label: '',         target: 'camera'      }, // tombol tengah
+        { icon: 'fa-chart-bar',  label: 'Laporan',  target: 'report-view' },
+        { icon: 'fa-chart-pie',  label: 'Statistik',target: 'statistik'   },
+    ];
+    const guestBtns = [
+        { icon: 'fa-keyboard',   label: 'Manual',   target: 'manual-view' },
+        { icon: 'fa-qrcode',     label: '',         target: 'camera'      },
+        { icon: 'fa-chart-pie',  label: 'Statistik',target: 'statistik'   },
+    ];
+
+    const btns = isAdmin ? adminBtns : guestBtns;
+    nav.innerHTML = btns.map(b => {
+        const isCamera = b.target === 'camera';
+        const cls = isCamera ? 'nav-btn nav-btn-camera' : 'nav-btn';
+        const dataAttr = isCamera ? '' : `data-target="${b.target}"`;
+        return `<button class="${cls}" ${dataAttr} onclick="handleNavClick('${b.target}')">
+            <i class="fas ${b.icon}"></i>
+            ${b.label ? `<span>${b.label}</span>` : ''}
+        </button>`;
+    }).join('');
+}
+
+window.handleNavClick = function(target) {
+    if (target === 'camera') {
+        openScanOverlay();
+    } else if (target === 'statistik') {
+        openStatistikModal();
+    } else {
+        navigateTo(target);
+    }
+};
 
 /**
  * Normalisasi ID barcode: selalu kembalikan string.
@@ -866,34 +906,9 @@ function renderReportTable(skipSummary = false) {
     if (showSummary && filteredData.length > 0) {
         summaryPanel.style.display = '';
 
-        // Hitung total per status
-        const statusCount = { Hadir: 0, Ijin: 0, Sakit: 0, Alpa: 0 };
-        filteredData.forEach(rec => {
-            const s = rec["STATUS"] || 'Hadir';
-            if (statusCount.hasOwnProperty(s)) statusCount[s]++;
-        });
-        const totalRec = filteredData.length;
-
         // Hitung jumlah hari unik dalam periode
         const uniqueDates = [...new Set(filteredData.map(r => String(r["TANGGAL"]).substring(0, 10)))];
         const totalHari = uniqueDates.length;
-
-        // Stat cards
-        const statDefs = [
-            { label: 'Total Presensi', value: totalRec,          icon: 'fa-list-check',    color: '#60a5fa' },
-            { label: 'Hari Kegiatan',  value: totalHari,         icon: 'fa-calendar-days', color: '#a78bfa' },
-            { label: 'Hadir',          value: statusCount.Hadir, icon: 'fa-check-circle',  color: '#4ade80' },
-            { label: 'Ijin',           value: statusCount.Ijin,  icon: 'fa-door-open',     color: '#60a5fa' },
-            { label: 'Sakit',          value: statusCount.Sakit, icon: 'fa-heartbeat',     color: '#f59e0b' },
-            { label: 'Alpa',           value: statusCount.Alpa,  icon: 'fa-times-circle',  color: '#f87171' },
-        ];
-        document.getElementById('reportStatCards').innerHTML = statDefs.map(s => `
-            <div style="flex:1;min-width:80px;background:rgba(15,23,42,0.5);border:1px solid ${s.color}40;
-                        border-radius:10px;padding:10px 8px;text-align:center;">
-                <i class="fas ${s.icon}" style="color:${s.color};font-size:1rem;display:block;margin-bottom:4px;"></i>
-                <div style="font-size:1.15rem;font-weight:700;color:${s.color};">${s.value}</div>
-                <div style="font-size:0.65rem;opacity:0.6;margin-top:2px;">${s.label}</div>
-            </div>`).join('');
 
         // Rekap per anggota: hitung Hadir/Ijin/Sakit/Alpa masing-masing
         const memberMap = {};
@@ -1072,22 +1087,19 @@ window.closeModal = function(id) {
 };
 
 function initScanner() {
-    if(scanReader) {
-        scanReader.clear();
-        scanReader = null;
-    }
+    if(scanReader) { scanReader.clear(); scanReader = null; }
     
-    scanReader = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    scanReader = new Html5Qrcode("scanOverlayReader");
+    const config = { fps: 10, qrbox: { width: 240, height: 240 } };
 
     scanReader.start({ facingMode: "environment" }, config, (decodedText) => {
-        scanReader.pause(true); // pause scanning momentarily
+        scanReader.pause(true);
+        closeScanOverlay();
         processScan(decodedText);
-    }, (error) => {
-        // ignore errors (mostly framing errors)
-    }).catch(err => {
+    }, () => {}).catch(err => {
         console.warn("Camera init failed:", err);
-        document.getElementById('reader').innerHTML = '<p style="padding:20px;">Kamera tidak dapat diakses. Silakan gunakan input manual.</p>';
+        document.getElementById('scanOverlayReader').innerHTML =
+            '<p style="padding:30px;text-align:center;color:#fff;opacity:0.6;">Kamera tidak dapat diakses. Gunakan input manual di bawah.</p>';
     });
 }
 
@@ -1113,12 +1125,11 @@ function showResultModal(member, msg) {
     
     document.getElementById('resultModal').style.display = 'flex';
     
-    // If scanner open, resume it when closing modal
-    const origClose = window.closeModal;
+    // Resume scanner jika overlay masih terbuka
     window.closeModal = function(id) {
-        origClose(id);
-        if(id === 'resultModal' && scanReader && scanReader.getState() === Html5QrcodeScannerState.PAUSED) {
-            scanReader.resume();
+        document.getElementById(id).style.display = 'none';
+        if (id === 'resultModal' && scanReader) {
+            try { scanReader.resume(); } catch(e) {}
         }
     };
 }
