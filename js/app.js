@@ -90,7 +90,15 @@ function openScanOverlay() {
 
 function closeScanOverlay() {
     document.getElementById('scanOverlay').classList.remove('open');
-    if (scanReader) { scanReader.clear(); scanReader = null; }
+    if (scanReader) {
+        const reader = scanReader;
+        scanReader = null;
+        try {
+            reader.stop().then(() => reader.clear()).catch(() => { try { reader.clear(); } catch(e) {} });
+        } catch(e) {
+            try { reader.clear(); } catch(e2) {}
+        }
+    }
     document.querySelectorAll('.nav-btn-camera').forEach(b => b.classList.remove('scanning'));
 }
 
@@ -1093,7 +1101,6 @@ function initScanner() {
     const config = { fps: 10, qrbox: { width: 240, height: 240 } };
 
     scanReader.start({ facingMode: "environment" }, config, (decodedText) => {
-        scanReader.pause(true);
         closeScanOverlay();
         processScan(decodedText);
     }, () => {}).catch(err => {
