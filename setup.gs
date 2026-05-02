@@ -4,6 +4,7 @@ const SCRIPT_VERSION = "1.0";
 const SHEET_ANGGOTA = "Anggota";
 const SHEET_ABSENSI = "Absensi";
 const SHEET_SETTINGS = "Settings";
+const SHEET_LATIHAN = "Latihan";
 
 // Entry point for setup
 function setupDatabase() {
@@ -49,6 +50,24 @@ function setupDatabase() {
     sheetSettings.appendRow(["TANGGAL_TANDA_TANGAN", "Otomatis (Hari Ini)"]);
     sheetSettings.appendRow(["ADMIN_PASSWORD", "pramuka123"]); // default password
   }
+
+  // 4. Setup Latihan Sheet
+  let sheetLatihan = ss.getSheetByName(SHEET_LATIHAN);
+  if (!sheetLatihan) {
+    sheetLatihan = ss.insertSheet(SHEET_LATIHAN);
+    sheetLatihan.appendRow(["TANGGAL", "GOLONGAN", "MATERI", "CATATAN"]);
+    sheetLatihan.setFrozenRows(1);
+    
+    // 2 Sampel Data Latihan
+    let today = new Date();
+    let dateStr = Utilities.formatDate(today, "Asia/Jakarta", "yyyy-MM-dd");
+    sheetLatihan.appendRow([dateStr, "Penggalang", "PBB (Peraturan Baris Berbaris)", "Latihan formasi dan gerakan dasar"]);
+    
+    let yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 7);
+    let dateStr2 = Utilities.formatDate(yesterday, "Asia/Jakarta", "yyyy-MM-dd");
+    sheetLatihan.appendRow([dateStr2, "Penegak", "Sandi Morse dan Semaphore", "Praktek komunikasi menggunakan sandi"]);
+  }
 }
 
 function doGet(e) {
@@ -64,6 +83,10 @@ function doGet(e) {
   
   if (action === 'getAttendance') {
     return ContentService.createTextOutput(JSON.stringify(getAttendance())).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'getLatihan') {
+    return ContentService.createTextOutput(JSON.stringify(getLatihan())).setMimeType(ContentService.MimeType.JSON);
   }
   
   return ContentService.createTextOutput(JSON.stringify({status: "success", message: "API is runnning."})).setMimeType(ContentService.MimeType.JSON);
@@ -87,6 +110,18 @@ function doPost(e) {
   
   if (action === 'deleteMember') {
     return ContentService.createTextOutput(JSON.stringify(deleteMember(requestData.id))).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'addLatihan') {
+    return ContentService.createTextOutput(JSON.stringify(addLatihan(requestData.data))).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'editLatihan') {
+    return ContentService.createTextOutput(JSON.stringify(editLatihan(requestData.data))).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'deleteLatihan') {
+    return ContentService.createTextOutput(JSON.stringify(deleteLatihan(requestData.rowIndex))).setMimeType(ContentService.MimeType.JSON);
   }
   
   return ContentService.createTextOutput(JSON.stringify({status: "error", message: "Unknown action"})).setMimeType(ContentService.MimeType.JSON);
@@ -338,4 +373,85 @@ function fixLeadingZeroIds() {
   }
 
   SpreadsheetApp.getUi().alert('Selesai! ' + fixedCount + ' baris ID absensi diperbaiki.');
+}
+
+
+// =======================
+// LATIHAN FUNCTIONS
+// =======================
+
+function getLatihan() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_LATIHAN);
+  if (!sheet) return [];
+  
+  const data = sheet.getDataRange().getValues();
+  let latihan = [];
+  let headers = data[0];
+  
+  for(let i = 1; i < data.length; i++) {
+    let rec = {};
+    for(let j = 0; j < headers.length; j++) {
+      let val = data[i][j];
+      let key = headers[j];
+
+      // Normalisasi kolom TANGGAL → string "yyyy-MM-dd"
+      if (key === "TANGGAL") {
+        if (val instanceof Date) {
+          val = Utilities.formatDate(val, "Asia/Jakarta", "yyyy-MM-dd");
+        } else {
+          val = String(val).substring(0, 10);
+        }
+      }
+
+      rec[key] = val;
+    }
+    rec._rowIndex = i + 1;
+    latihan.push(rec);
+  }
+  return latihan;
+}
+
+function addLatihan(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_LATIHAN);
+  if (!sheet) return {status: "error", message: "Sheet Latihan tidak ditemukan"};
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  
+  let newRow = [];
+  for(let i=0; i<headers.length; i++){
+    newRow.push(data[headers[i]] || "");
+  }
+  sheet.appendRow(newRow);
+  return { status: "success", message: "Catatan latihan berhasil ditambahkan" };
+}
+
+function editLatihan(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_LATIHAN);
+  if (!sheet) return {status: "error", message: "Sheet Latihan tidak ditemukan"};
+  
+  let rowIndex = data._rowIndex;
+  if(!rowIndex) return {status: "error", message: "Invalid row index"};
+  
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  let updateRow = [];
+  for(let i=0; i<headers.length; i++){
+    updateRow.push(data[headers[i]] || "");
+  }
+  
+  sheet.getRange(rowIndex, 1, 1, headers.length).setValues([updateRow]);
+  return { status: "success", message: "Catatan latihan berhasil diupdate" };
+}
+
+function deleteLatihan(rowIndex) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_LATIHAN);
+  if (!sheet) return {status: "error", message: "Sheet Latihan tidak ditemukan"};
+  
+  if(!rowIndex || rowIndex <= 1) return {status: "error", message: "Invalid row index"};
+  
+  sheet.deleteRow(rowIndex);
+  return { status: "success", message: "Catatan latihan berhasil dihapus" };
 }
