@@ -111,6 +111,7 @@
                         <div style="margin-bottom:12px;">
                             <label class="block mb-2" style="font-size:0.85rem;">Status Kehadiran</label>
                             <select id="selectStatus" class="glass-input w-100">
+                                <option value="Masuk">Masuk</option>
                                 <option value="Ijin">Ijin</option>
                                 <option value="Sakit">Sakit</option>
                                 <option value="Alpa">Alpa</option>
@@ -183,6 +184,28 @@
                         <button id="btnNextPage" class="btn-icon"><i class="fas fa-angle-right"></i></button>
                         <button id="btnLastPage" class="btn-icon"><i class="fas fa-angle-double-right"></i></button>
                     </div>
+                </div>
+            </section>
+
+            <!-- LATIHAN VIEW -->
+            <section id="latihan-view" class="view">
+                <div class="glass-panel">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                        <h2 class="page-title" style="margin:0;"><i class="fas fa-dumbbell"></i>Catatan Latihan</h2>
+                        <button id="btnAddLatihan" class="btn-primary" style="padding:7px 12px;font-size:0.8rem;"><i class="fas fa-plus"></i> Tambah</button>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
+                        <select id="filterGolonganLatihan" class="glass-input" style="flex:1;">
+                            <option value="">Semua Golongan</option>
+                            <option value="Siaga">Siaga</option>
+                            <option value="Penggalang">Penggalang</option>
+                            <option value="Penegak">Penegak</option>
+                            <option value="Pandega">Pandega</option>
+                            <option value="Pembina">Pembina</option>
+                        </select>
+                        <button id="btnSyncLatihan" class="btn-success" style="padding:7px 12px;font-size:0.8rem;"><i class="fas fa-sync"></i></button>
+                    </div>
+                    <div id="latihanList" style="max-height:400px;overflow-y:auto;"></div>
                 </div>
             </section>
         </main>
@@ -293,6 +316,43 @@
                     <button onclick="closeModal('golonganModal')" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:1.1rem;cursor:pointer;padding:4px;"><i class="fas fa-times"></i></button>
                 </div>
                 <div id="golModalBody" style="overflow-y:auto;flex:1;"></div>
+            </div>
+        </div>
+
+        <!-- LATIHAN MODAL -->
+        <div id="latihanModal" class="modal-overlay" style="display:none;">
+            <div class="modal-content glass-panel" style="max-width:500px;">
+                <h3 id="latihanModalTitle" class="mb-4">Tambah Catatan Latihan</h3>
+                <form id="formLatihan">
+                    <input type="hidden" id="latihanRowIndex">
+                    <div style="margin-bottom:12px;">
+                        <label class="block mb-2" style="font-size:0.85rem;">Tanggal Latihan*</label>
+                        <input type="date" id="latihanTanggal" class="glass-input w-100" required>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label class="block mb-2" style="font-size:0.85rem;">Golongan*</label>
+                        <select id="latihanGolongan" class="glass-input w-100" required>
+                            <option value="">Pilih Golongan</option>
+                            <option value="Siaga">Siaga</option>
+                            <option value="Penggalang">Penggalang</option>
+                            <option value="Penegak">Penegak</option>
+                            <option value="Pandega">Pandega</option>
+                            <option value="Pembina">Pembina</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label class="block mb-2" style="font-size:0.85rem;">Materi Latihan*</label>
+                        <input type="text" id="latihanMateri" class="glass-input w-100" placeholder="Contoh: PBB, Sandi Morse, dll" required>
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <label class="block mb-2" style="font-size:0.85rem;">Catatan</label>
+                        <textarea id="latihanCatatan" class="glass-input w-100" rows="4" placeholder="Catatan tambahan tentang latihan..."></textarea>
+                    </div>
+                    <div style="display:flex;justify-content:flex-end;gap:8px;">
+                        <button type="button" class="btn-secondary" onclick="closeModal('latihanModal')">Batal</button>
+                        <button type="submit" class="btn-primary">Simpan</button>
+                    </div>
+                </form>
             </div>
         </div>
 
