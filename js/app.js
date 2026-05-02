@@ -34,7 +34,8 @@ async function initApp() {
         await Promise.all([
             fetchSettings(),
             fetchMembers(),
-            fetchAttendance()
+            fetchAttendance(),
+            fetchLatihan()
         ]);
         updateStats();
         renderRecentAttendance();
@@ -43,6 +44,10 @@ async function initApp() {
         // Re-render laporan jika view laporan sedang aktif
         if (document.getElementById('report-view').style.display !== 'none') {
             renderReportTable();
+        }
+        // Render latihan jika view latihan sedang aktif
+        if (document.getElementById('latihan-view') && document.getElementById('latihan-view').style.display !== 'none') {
+            renderLatihanList();
         }
     } catch (e) {
         Swal.fire('Error', 'Gagal memuat data dari Spreadsheet. Pastikan URL API sudah benar pada js/api-config.js', 'error');
@@ -78,6 +83,9 @@ function navigateTo(targetId) {
         });
     }
     if (targetId === 'admin-view') { currentPage = 1; renderMembersTable(); }
+    if (targetId === 'latihan-view') { 
+        fetchLatihan().then(renderLatihanList); 
+    }
 }
 
 function openScanOverlay() {
@@ -234,13 +242,14 @@ function renderBottomNav() {
     if (!nav) return;
 
     // Definisi tombol sesuai role
-    // Admin: Absen Manual | Kelola Anggota | [KAMERA] | Laporan | Statistik
-    // Tamu:  Absen Manual | [KAMERA] | Statistik
+    // Admin: Manual | Kelola | [KAMERA] | Laporan | Latihan | Statistik
+    // Tamu:  Manual | [KAMERA] | Statistik
     const adminBtns = [
         { icon: 'fa-keyboard',   label: 'Manual',   target: 'manual-view' },
         { icon: 'fa-users-cog',  label: 'Kelola',   target: 'admin-view'  },
         { icon: 'fa-qrcode',     label: '',         target: 'camera'      }, // tombol tengah
         { icon: 'fa-chart-bar',  label: 'Laporan',  target: 'report-view' },
+        { icon: 'fa-dumbbell',   label: 'Latihan',  target: 'latihan-view' },
         { icon: 'fa-chart-pie',  label: 'Statistik',target: 'statistik'   },
     ];
     const guestBtns = [
@@ -428,8 +437,8 @@ function showGolonganModal(g, dateStr, hadirPerGol, totalPerGol, memberGolMap) {
     const hadir  = anggotaGol.filter(m => absenHariIni[String(m["ID (BARCODE)"])]);
     const belum  = anggotaGol.filter(m => !absenHariIni[String(m["ID (BARCODE)"])]);
 
-    const statusColor = { 'Hadir': '#4ade80', 'Ijin': '#60a5fa', 'Sakit': '#f59e0b', 'Alpa': '#f87171' };
-    const statusIcon  = { 'Hadir': 'fa-check-circle', 'Ijin': 'fa-door-open', 'Sakit': 'fa-heartbeat', 'Alpa': 'fa-times-circle' };
+    const statusColor = { 'Masuk': '#4ade80', 'Hadir': '#4ade80', 'Ijin': '#60a5fa', 'Sakit': '#f59e0b', 'Alpa': '#f87171' };
+    const statusIcon  = { 'Masuk': 'fa-check-circle', 'Hadir': 'fa-check-circle', 'Ijin': 'fa-door-open', 'Sakit': 'fa-heartbeat', 'Alpa': 'fa-times-circle' };
 
     function buildRow(m, status) {
         const foto  = getAvatarSrc(m["URL FOTO"], m["NAMA LENGKAP"], 36);
@@ -552,8 +561,8 @@ function renderRecentAttendance() {
     const memberMap = {};
     members.forEach(m => { memberMap[m["ID (BARCODE)"]] = m; });
 
-    const statusColor = { 'Hadir': '#4ade80', 'Ijin': '#60a5fa', 'Sakit': '#f59e0b', 'Alpa': '#f87171' };
-    const statusIcon  = { 'Hadir': 'fa-check-circle', 'Ijin': 'fa-door-open', 'Sakit': 'fa-heartbeat', 'Alpa': 'fa-times-circle' };
+    const statusColor = { 'Masuk': '#4ade80', 'Hadir': '#4ade80', 'Ijin': '#60a5fa', 'Sakit': '#f59e0b', 'Alpa': '#f87171' };
+    const statusIcon  = { 'Masuk': 'fa-check-circle', 'Hadir': 'fa-check-circle', 'Ijin': 'fa-door-open', 'Sakit': 'fa-heartbeat', 'Alpa': 'fa-times-circle' };
 
     container.innerHTML = '';
     todayAttendance.forEach((rec, idx) => {
@@ -938,7 +947,7 @@ function renderReportTable(skipSummary = false) {
         // Urutkan: Hadir terbanyak dulu
         const sorted = Object.values(perAnggota).sort((a, b) => b.Hadir - a.Hadir);
 
-        const statusColor = { Hadir: '#4ade80', Ijin: '#60a5fa', Sakit: '#f59e0b', Alpa: '#f87171' };
+        const statusColor = { Masuk: '#4ade80', Hadir: '#4ade80', Ijin: '#60a5fa', Sakit: '#f59e0b', Alpa: '#f87171' };
 
         document.getElementById('reportPeriodLabel').textContent = getPeriodLabel();
         document.getElementById('reportMemberSummary').innerHTML = sorted.map((a, idx) => {
@@ -992,7 +1001,7 @@ function renderReportTable(skipSummary = false) {
             }
         }
 
-        const statusColors = { 'Hadir':'var(--success-color)', 'Ijin':'#60a5fa', 'Sakit':'#f59e0b', 'Alpa':'var(--danger-color)' };
+        const statusColors = { 'Masuk':'var(--success-color)', 'Hadir':'var(--success-color)', 'Ijin':'#60a5fa', 'Sakit':'#f59e0b', 'Alpa':'var(--danger-color)' };
         const statusBg = statusColors[rec["STATUS"]] || 'var(--danger-color)';
 
         let tr = document.createElement('tr');
@@ -1265,7 +1274,7 @@ const GOLONGAN_CFG = [
     { name: 'Pandega',    icon: 'fa-user-graduate',      color: '#f97316' },
     { name: 'Pembina',    icon: 'fa-chalkboard-teacher', color: '#a855f7' },
 ];
-const STATUS_COLOR = { Hadir:'#4ade80', Ijin:'#60a5fa', Sakit:'#f59e0b', Alpa:'#f87171' };
+const STATUS_COLOR = { Masuk:'#4ade80', Hadir:'#4ade80', Ijin:'#60a5fa', Sakit:'#f59e0b', Alpa:'#f87171' };
 
 /** Filter attendance sesuai setting modal statistik */
 function getStatFilteredData() {
@@ -1631,3 +1640,233 @@ function printStatistik() {
         document.getElementById('printStatArea').style.display = 'none';
     }, 500);
 }
+
+// =======================
+// LATIHAN (TRAINING LOG)
+// =======================
+
+let latihanData = [];
+
+async function fetchLatihan() {
+    try {
+        latihanData = await callAPI('getLatihan');
+        console.log('[Debug] Data latihan:', latihanData.length, 'records');
+    } catch(e) {
+        console.warn('Fetch latihan failed:', e);
+        latihanData = [];
+    }
+}
+
+function renderLatihanList() {
+    const container = document.getElementById('latihanList');
+    if (!container) return;
+
+    const filterGol = document.getElementById('filterGolonganLatihan').value;
+    
+    // Filter berdasarkan golongan
+    const filtered = filterGol 
+        ? latihanData.filter(l => l["GOLONGAN"] === filterGol)
+        : latihanData;
+
+    // Sort by date descending
+    const sorted = [...filtered].sort((a, b) => {
+        const dateA = String(a["TANGGAL"]).substring(0, 10);
+        const dateB = String(b["TANGGAL"]).substring(0, 10);
+        return dateB.localeCompare(dateA);
+    });
+
+    if (sorted.length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center;padding:40px 20px;opacity:0.4;font-size:0.85rem;">
+                <i class="fas fa-clipboard-list" style="font-size:2rem;display:block;margin-bottom:10px;"></i>
+                ${filterGol ? 'Belum ada catatan latihan untuk golongan ini' : 'Belum ada catatan latihan'}
+            </div>`;
+        return;
+    }
+
+    const golColors = {
+        'Siaga': '#22c55e',
+        'Penggalang': '#ef4444',
+        'Penegak': '#eab308',
+        'Pandega': '#f97316',
+        'Pembina': '#a855f7'
+    };
+
+    container.innerHTML = '';
+    sorted.forEach((item, idx) => {
+        const tanggal = String(item["TANGGAL"]).substring(0, 10);
+        const gol = item["GOLONGAN"] || '-';
+        const materi = item["MATERI"] || '-';
+        const catatan = item["CATATAN"] || '';
+        const color = golColors[gol] || '#94a3b8';
+
+        const card = document.createElement('div');
+        card.style.cssText = `
+            background:rgba(15,23,42,0.5);
+            border:1px solid ${color}30;
+            border-radius:10px;
+            padding:12px 14px;
+            margin-bottom:10px;
+            animation: fadeInUp 0.3s ease both;
+            animation-delay: ${idx * 30}ms;
+        `;
+        
+        card.innerHTML = `
+            <div style="display:flex;align-items:start;gap:10px;margin-bottom:8px;">
+                <div style="width:40px;height:40px;border-radius:8px;background:${color}20;
+                            border:1px solid ${color}50;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas fa-dumbbell" style="color:${color};font-size:1rem;"></i>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:0.9rem;margin-bottom:2px;">${materi}</div>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <span style="font-size:0.7rem;background:${color}15;color:${color};
+                                     border:1px solid ${color}40;border-radius:4px;padding:2px 8px;">
+                            ${gol}
+                        </span>
+                        <span style="font-size:0.7rem;opacity:0.5;">
+                            <i class="fas fa-calendar" style="margin-right:3px;"></i>${formatTanggal(tanggal)}
+                        </span>
+                    </div>
+                </div>
+                <div style="display:flex;gap:4px;flex-shrink:0;">
+                    <button onclick="editLatihan(${item._rowIndex})" class="btn-icon" style="font-size:0.8rem;padding:6px 8px;" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="deleteLatihan(${item._rowIndex})" class="btn-icon text-danger" style="font-size:0.8rem;padding:6px 8px;" title="Hapus">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            ${catatan ? `
+                <div style="background:rgba(255,255,255,0.03);border-radius:6px;padding:8px 10px;
+                            font-size:0.78rem;line-height:1.4;opacity:0.8;border-left:2px solid ${color};">
+                    ${catatan}
+                </div>
+            ` : ''}
+        `;
+        
+        container.appendChild(card);
+    });
+}
+
+function formatTanggal(dateStr) {
+    const [y, m, d] = dateStr.split('-');
+    const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+    return `${parseInt(d)} ${months[parseInt(m)-1]} ${y}`;
+}
+
+window.editLatihan = function(rowIndex) {
+    const item = latihanData.find(l => l._rowIndex === rowIndex);
+    if (!item) return;
+
+    document.getElementById('latihanRowIndex').value = rowIndex;
+    document.getElementById('latihanTanggal').value = String(item["TANGGAL"]).substring(0, 10);
+    document.getElementById('latihanGolongan').value = item["GOLONGAN"] || '';
+    document.getElementById('latihanMateri').value = item["MATERI"] || '';
+    document.getElementById('latihanCatatan').value = item["CATATAN"] || '';
+    document.getElementById('latihanModalTitle').innerText = 'Edit Catatan Latihan';
+    document.getElementById('latihanModal').style.display = 'flex';
+};
+
+window.deleteLatihan = async function(rowIndex) {
+    const result = await Swal.fire({
+        title: 'Hapus Catatan?',
+        text: 'Catatan latihan ini akan dihapus permanen',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, Hapus',
+        cancelButtonText: 'Batal'
+    });
+
+    if (!result.isConfirmed) return;
+
+    Swal.fire({ title: 'Menghapus...', didOpen: () => Swal.showLoading() });
+    try {
+        const res = await callAPI('deleteLatihan', { rowIndex: rowIndex });
+        if (res.status === 'success') {
+            await fetchLatihan();
+            renderLatihanList();
+            Swal.fire('Terhapus', res.message, 'success');
+        } else {
+            Swal.fire('Gagal', res.message, 'error');
+        }
+    } catch(e) {
+        Swal.fire('Error', 'Terjadi kesalahan jaringan', 'error');
+    }
+};
+
+async function saveLatihan() {
+    const rowIndex = document.getElementById('latihanRowIndex').value;
+    const data = {
+        "TANGGAL": document.getElementById('latihanTanggal').value,
+        "GOLONGAN": document.getElementById('latihanGolongan').value,
+        "MATERI": document.getElementById('latihanMateri').value,
+        "CATATAN": document.getElementById('latihanCatatan').value
+    };
+
+    if (rowIndex) {
+        data._rowIndex = parseInt(rowIndex);
+    }
+
+    Swal.fire({ title: 'Menyimpan...', didOpen: () => Swal.showLoading() });
+    
+    try {
+        const action = rowIndex ? 'editLatihan' : 'addLatihan';
+        const res = await callAPI(action, { data: data });
+        
+        if (res.status === 'success') {
+            closeModal('latihanModal');
+            await fetchLatihan();
+            renderLatihanList();
+            Swal.fire('Berhasil', res.message, 'success');
+        } else {
+            Swal.fire('Gagal', res.message, 'error');
+        }
+    } catch(e) {
+        Swal.fire('Error', 'Terjadi kesalahan jaringan', 'error');
+    }
+}
+
+// Setup event listeners untuk latihan
+document.addEventListener('DOMContentLoaded', () => {
+    // Tambahkan event listener untuk tombol tambah latihan
+    const btnAddLatihan = document.getElementById('btnAddLatihan');
+    if (btnAddLatihan) {
+        btnAddLatihan.addEventListener('click', () => {
+            document.getElementById('formLatihan').reset();
+            document.getElementById('latihanRowIndex').value = '';
+            document.getElementById('latihanModalTitle').innerText = 'Tambah Catatan Latihan';
+            // Set tanggal hari ini sebagai default
+            const today = new Date();
+            const dateStr = today.getFullYear() + '-' + 
+                          String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                          String(today.getDate()).padStart(2, '0');
+            document.getElementById('latihanTanggal').value = dateStr;
+            document.getElementById('latihanModal').style.display = 'flex';
+        });
+    }
+
+    // Form submit latihan
+    const formLatihan = document.getElementById('formLatihan');
+    if (formLatihan) {
+        formLatihan.addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveLatihan();
+        });
+    }
+
+    // Filter golongan latihan
+    const filterGol = document.getElementById('filterGolonganLatihan');
+    if (filterGol) {
+        filterGol.addEventListener('change', renderLatihanList);
+    }
+
+    // Sync button latihan
+    const btnSyncLatihan = document.getElementById('btnSyncLatihan');
+    if (btnSyncLatihan) {
+        btnSyncLatihan.addEventListener('click', () => {
+            fetchLatihan().then(renderLatihanList);
+        });
+    }
+});
